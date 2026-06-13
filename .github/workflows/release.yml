@@ -1,0 +1,43 @@
+# Build merlin.prg and attach it to a GitHub Release on every version tag,
+# so players can download a ready-to-run binary without a toolchain.
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# The ROM is pulled from the lets-go-merlin module at build time (nothing
+# ROM-shaped lives in this repo), so the runner needs only network access.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)build and attach merlin.prg to'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build merlin.prg
+        run: make
+
+      - name: Attach merlin.prg to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          gh release create "$TAG" merlin.prg \
+            --title "Merlin on the C64 $TAG" \
+            --notes "Load \`merlin.prg\` on a real C64, VICE, or an Ultimate (\`u64ctl run merlin.prg\`)." \
+          || gh release upload "$TAG" merlin.prg --clobber
