@@ -4,44 +4,32 @@ import (
 	"os"
 	"testing"
 
-	"github.com/beevik/go6502/cpu"
 	"github.com/carledwards/go6asm/asm"
+	"github.com/carledwards/go6sim/sim"
+	"github.com/carledwards/lets-go-merlin/roms"
 	"github.com/carledwards/merlin-c64/romgen"
 	"github.com/carledwards/merlin-c64/siddata"
 	"github.com/carledwards/merlin-c64/songgen"
 	"github.com/carledwards/merlin-c64/sprites"
-	"github.com/carledwards/lets-go-merlin/roms"
 )
 
-// keyMatrix models just enough of CIA1 to test the keyboard scan: a
+// wireKeyMatrix models just enough of CIA1 to test the keyboard scan: a
 // write to $DC00 latches the active-low column select, and a read of
 // $DC01 returns the rows (a held key in a selected column reads 0).
-// Everything else delegates to the flat 64K space.
-type keyMatrix struct {
-	*cpu.FlatMemory
-	colSel  byte
-	pressed [8]byte // pressed[c64col] = OR of (1<<c64row) held in that column
-}
-
-func (k *keyMatrix) StoreByte(addr uint16, v byte) {
-	if addr == 0xDC00 {
-		k.colSel = v
-		return
-	}
-	k.FlatMemory.StoreByte(addr, v)
-}
-
-func (k *keyMatrix) LoadByte(addr uint16) byte {
-	if addr == 0xDC01 {
+// Everything else stays in the flat 64K space. pressed[c64col] is the OR
+// of (1<<c64row) for keys held in that column.
+func wireKeyMatrix(m *sim.Machine, pressed [8]byte) {
+	colSel := byte(0xFF)
+	m.OnWrite(0xDC00, func(v byte) { colSel = v })
+	m.OnRead(0xDC01, func() byte {
 		rows := byte(0xFF)
 		for col := 0; col < 8; col++ {
-			if k.colSel&(1<<col) == 0 { // column driven low = selected
-				rows &^= k.pressed[col]
+			if colSel&(1<<col) == 0 { // column driven low = selected
+				rows &^= pressed[col]
 			}
 		}
 		return rows
-	}
-	return k.FlatMemory.LoadByte(addr)
+	})
 }
 
 // TestKeyboardMatrix holds each Merlin button via its mapped C64 key and
@@ -99,23 +87,24 @@ func TestKeyboardMatrix(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			mem := &keyMatrix{FlatMemory: cpu.NewFlatMemory(), colSel: 0xFF}
-			mem.StoreBytes(r.Origin, r.Image)
-			mem.pressed[tc.c64col] = 1 << tc.c64row
-			c := cpu.NewCPU(cpu.NMOS, mem)
-			c.SetPC(init)
+			m := sim.New(sim.NMOS)
+			m.StoreBytes(r.Origin, r.Image)
+			var pressed [8]byte
+			pressed[tc.c64col] = 1 << tc.c64row
+			wireKeyMatrix(m, pressed)
+			m.SetPC(init)
 
 			// Run well past two scankbd cycles (every 256 steps) so kcol
 			// reflects the held key.
 			for steps := 0; steps < 1000; {
-				c.Step()
-				if c.Reg.PC == loop {
+				m.Step()
+				if m.PC() == loop {
 					steps++
 				}
 			}
 
 			for i := 0; i < 4; i++ {
-				got := mem.FlatMemory.LoadByte(kcol + uint16(i))
+				got := m.Peek(kcol + uint16(i))
 				want := byte(0)
 				if i == tc.wantCol {
 					want = tc.wantBits

@@ -6,3 +6,6 @@ sprites.bin
 sidfreq.bin
 songs.bin
 merlin.prg
+
+# Local Claude Code config (per-developer; not committed)
+.claude/

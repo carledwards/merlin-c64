@@ -1,6 +1,6 @@
-github.com/beevik/go6502 v0.3.0 h1:1Gsf1VZjZapXcQbrIzgnqHCPy9+4QuaUNZKyCVBGISY=
-github.com/beevik/go6502 v0.3.0/go.mod h1:RnOLF4I+55D4QsUn0BQK1Sy40dtjco/XHC+iI82IBU0=
 github.com/carledwards/go6asm v0.1.2 h1:K4qjLuKKQMsWOTM7flU2wvgoI5N1uEQYqFerdwNlVmg=
 github.com/carledwards/go6asm v0.1.2/go.mod h1:G1kCZnyiYh+PXbkFJpvSz+N8hM1FdPOLC+0MflRfOJk=
+github.com/carledwards/go6sim v0.2.0 h1:HRn68Tj7NTYixzMootHEXZbv9n2qhhYhc70y+06p80Q=
+github.com/carledwards/go6sim v0.2.0/go.mod h1:+C5YVfnLiP8IFDMwAEyHU2W95Fo20yudmzyMP5vyR4s=
 github.com/carledwards/lets-go-merlin v0.0.0-20260524151104-dfcae758d82a h1:K/Xh//+sQLwVhVi/2Pn+bjjZG45GR7/6Khbcb7s1dl8=
 github.com/carledwards/lets-go-merlin v0.0.0-20260524151104-dfcae758d82a/go.mod h1:8UukWVRK1tdYWVzTyAH+wWk4B9YcbBN8ApPvGRiLs/k=

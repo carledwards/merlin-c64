@@ -1,9 +1,9 @@
 // The Merlin-on-C64 differential: assemble merlin.s with go6asm, run it
-// on the neutral beevik/go6502 emulator, and lock the 6502 TMS1100
-// interpreter step-for-step to the lets-go-merlin Go core running the
-// same ROM. Every architectural register the Go core exposes is
-// compared at every TMS instruction boundary, plus the R0-R10 latches
-// that drive the LED pads.
+// on go6sim's NMOS interpretive core (the C64's 6510 is NMOS), and lock
+// the 6502 TMS1100 interpreter step-for-step to the lets-go-merlin Go
+// core running the same ROM. Every architectural register the Go core
+// exposes is compared at every TMS instruction boundary, plus the
+// R0-R10 latches that drive the LED pads.
 // Lives in its own package because the Go toolchain would otherwise try
 // to build ../merlin.s as Go assembly.
 package lockstep
@@ -13,14 +13,14 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/beevik/go6502/cpu"
 	"github.com/carledwards/go6asm/asm"
+	"github.com/carledwards/go6sim/sim"
+	"github.com/carledwards/lets-go-merlin/pkg/tms1100"
+	"github.com/carledwards/lets-go-merlin/roms"
 	"github.com/carledwards/merlin-c64/romgen"
 	"github.com/carledwards/merlin-c64/siddata"
 	"github.com/carledwards/merlin-c64/songgen"
 	"github.com/carledwards/merlin-c64/sprites"
-	"github.com/carledwards/lets-go-merlin/pkg/tms1100"
-	"github.com/carledwards/lets-go-merlin/roms"
 )
 
 // tmsSteps is how many TMS1100 instructions the lockstep run covers.
@@ -67,11 +67,10 @@ func TestLockstepAgainstGoCore(t *testing.T) {
 		return v
 	}
 
-	mem := cpu.NewFlatMemory()
-	mem.StoreBytes(r.Origin, r.Image)
-	mem.StoreByte(0xDC01, 0xFF) // keyboard rows idle (active low) = no key held
-	c := cpu.NewCPU(cpu.NMOS, mem)
-	c.SetPC(sym("init"))
+	m := sim.New(sim.NMOS)
+	m.StoreBytes(r.Origin, r.Image)
+	m.StoreByte(0xDC01, 0xFF) // keyboard rows idle (active low) = no key held
+	m.SetPC(sym("init"))
 
 	ref, err := tms1100.New(roms.MP3404)
 	if err != nil {
@@ -88,12 +87,12 @@ func TestLockstepAgainstGoCore(t *testing.T) {
 	runToLoop := func() {
 		const maxInstr = 100_000 // one TMS step is ~30 6502 instructions
 		for i := 0; i < maxInstr; i++ {
-			c.Step()
-			if c.Reg.PC == loop {
+			m.Step()
+			if m.PC() == loop {
 				return
 			}
 		}
-		t.Fatalf("6502 never returned to the interpreter loop (PC=$%04X)", c.Reg.PC)
+		t.Fatalf("6502 never returned to the interpreter loop (PC=$%04X)", m.PC())
 	}
 
 	b2 := func(b bool) byte {
@@ -102,7 +101,7 @@ func TestLockstepAgainstGoCore(t *testing.T) {
 		}
 		return 0
 	}
-	zp := func(name string) byte { return mem.LoadByte(sym(name)) }
+	zp := func(name string) byte { return m.LoadByte(sym(name)) }
 
 	compare := func(step int) {
 		type reg struct {
@@ -130,7 +129,7 @@ func TestLockstepAgainstGoCore(t *testing.T) {
 			}
 		}
 		for i := 0; i < 11; i++ {
-			if got, want := mem.LoadByte(rlines+uint16(i)), b2(ref.R(i)); got != want {
+			if got, want := m.LoadByte(rlines+uint16(i)), b2(ref.R(i)); got != want {
 				t.Fatalf("step %d: R%d = %d, Go core has %d", step, i, got, want)
 			}
 		}

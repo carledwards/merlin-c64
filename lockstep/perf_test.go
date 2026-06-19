@@ -4,13 +4,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/beevik/go6502/cpu"
 	"github.com/carledwards/go6asm/asm"
+	"github.com/carledwards/go6sim/sim"
+	"github.com/carledwards/lets-go-merlin/roms"
 	"github.com/carledwards/merlin-c64/romgen"
 	"github.com/carledwards/merlin-c64/siddata"
 	"github.com/carledwards/merlin-c64/songgen"
 	"github.com/carledwards/merlin-c64/sprites"
-	"github.com/carledwards/lets-go-merlin/roms"
 )
 
 // TestCyclesPerStep reports the average 6502 cycle cost of one
@@ -40,26 +40,25 @@ func TestCyclesPerStep(t *testing.T) {
 		syms[s.Name] = s.Addr
 	}
 
-	mem := cpu.NewFlatMemory()
-	mem.StoreBytes(r.Origin, r.Image)
-	mem.StoreByte(0xDC01, 0xFF) // keyboard rows idle = no key held
-	c := cpu.NewCPU(cpu.NMOS, mem)
-	c.SetPC(syms["init"])
+	m := sim.New(sim.NMOS)
+	m.StoreBytes(r.Origin, r.Image)
+	m.StoreByte(0xDC01, 0xFF) // keyboard rows idle = no key held
+	m.SetPC(syms["init"])
 	loop := syms["loop"]
 
-	for c.Reg.PC != loop { // run init out to the first fetch
-		c.Step()
+	for m.PC() != loop { // run init out to the first fetch
+		m.Step()
 	}
 
 	const n = 500_000
-	start := c.Cycles
+	start := m.Cycles()
 	for steps := 0; steps < n; {
-		c.Step()
-		if c.Reg.PC == loop {
+		m.Step()
+		if m.PC() == loop {
 			steps++
 		}
 	}
-	cyc := c.Cycles - start
+	cyc := m.Cycles() - start
 	perStep := float64(cyc) / n
 	t.Logf("%.1f 6502 cycles per TMS step  =>  ~%.0f Merlin instr/sec on a 1 MHz C64",
 		perStep, 1e6/perStep)
